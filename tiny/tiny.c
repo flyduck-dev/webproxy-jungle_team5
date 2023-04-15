@@ -1,9 +1,9 @@
 /* $begin tinymain */
 /*
- * tiny.c - A simple, iterative HTTP/1.0 Web server that uses the
+ * tiny.c - A simple, iterative HTTP/1.0 Web server that uses the 
  *     GET method to serve static and dynamic content.
  *
- * Updated 11/2019 droh
+ * Updated 11/2019 droh 
  *   - Fixed sprintf() aliasing issue in serve_static(), and clienterror().
  */
 #include "csapp.h"
@@ -14,38 +14,35 @@ int parse_uri(char *uri, char *filename, char *cgiargs);
 void serve_static(int fd, char *filename, int filesize);
 void get_filetype(char *filename, char *filetype);
 void serve_dynamic(int fd, char *filename, char *cgiargs);
-void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
-                 char *longmsg);
+void clienterror(int fd, char *cause, char *errnum, 
+		 char *shortmsg, char *longmsg);
 
-int main(int argc, char **argv) {
-  int listenfd, connfd;
-  char hostname[MAXLINE], port[MAXLINE];
-  socklen_t clientlen;
-  struct sockaddr_storage clientaddr;
+int main(int argc, char **argv) 
+{
+    int listenfd, connfd;
+    char hostname[MAXLINE], port[MAXLINE];
+    socklen_t clientlen;
+    struct sockaddr_storage clientaddr;
 
-  /* Check command line args */
-  if (argc != 2) {
-    fprintf(stderr, "usage: %s <port>\n", argv[0]);
-    exit(1);
-  }
+    /* Check command line args */
+    if (argc != 2) {
+	fprintf(stderr, "usage: %s <port>\n", argv[0]);
+	exit(1);
+    }
 
-  listenfd = Open_listenfd(argv[1]);
-  while (1) {
-    clientlen = sizeof(clientaddr);
-    connfd = Accept(listenfd, (SA *)&clientaddr,
-                    &clientlen);  // line:netp:tiny:accept
-    Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE,
-                0);
-    printf("Accepted connection from (%s, %s)\n", hostname, port);
-    doit(connfd);   // line:netp:tiny:doit
-    Close(connfd);  // line:netp:tiny:close
-  }
+    listenfd = Open_listenfd(argv[1]);
+    while (1) {
+	clientlen = sizeof(clientaddr);
+	connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); //line:netp:tiny:accept
+        Getnameinfo((SA *) &clientaddr, clientlen, hostname, MAXLINE, 
+                    port, MAXLINE, 0);
+        printf("Accepted connection from (%s, %s)\n", hostname, port);
+	doit(connfd);                                             //line:netp:tiny:doit
+	Close(connfd);                                            //line:netp:tiny:close
+    }
 }
 /* $end tinymain */
-//이 코드는 Tiny 웹 서버에서 클라이언트 요청을 처리하는 함수인 doit 함수입니다.
-//함수의 인자로는 클라이언트와 연결된 파일 디스크립터(fd)가 전달됩니다.
-//함수 내부에서는 클라이언트 요청을 파싱하고, 요청된 URI를 정적인 파일 경로와 동적인 CGI 프로그램 경로로 분리합니다. 그리고 해당 파일 또는 CGI 프로그램이 존재하는지 여부를 확인하고, 정적인 파일인 경우에는 해당 파일을 반환하고, 동적인 CGI 프로그램인 경우에는 해당 프로그램을 실행한 결과를 반환합니다.
-//이 함수는 전체적인 Tiny 웹 서버의 동작 방식 중 가장 중요한 역할을 담당하고 있습니다.
+
 /*
  * doit - handle one HTTP request/response transaction
  */
@@ -164,21 +161,22 @@ void serve_static(int fd, char *filename, int filesize)
     sprintf(buf, "Server: Tiny Web Server\r\n");
     Rio_writen(fd, buf, strlen(buf));
     sprintf(buf, "Content-length: %d\r\n", filesize);
+
     Rio_writen(fd, buf, strlen(buf));
     sprintf(buf, "Content-type: %s\r\n\r\n", filetype);
     Rio_writen(fd, buf, strlen(buf));    //line:netp:servestatic:endserve
 
+    //if (strcasecmp(method, "GET") == 0) { // 11.11
     /* Send response body to client */
-    srcfd = Open(filename, O_RDONLY, 0); //line:netp:servestatic:open
-    //srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); //line:netp:servestatic:mmap
-    
-    //윗 줄을 아래 두줄로 대체 가능
-    srcp = (char *)malloc(filesize);
-    Rio_readnb(srcfd,srcp,filesize);
-
-    Close(srcfd);                       //line:netp:servestatic:close
-    Rio_writen(fd, srcp, filesize);     //line:netp:servestatic:write
-    Munmap(srcp, filesize);             //line:netp:servestatic:munmap
+    srcfd = Open(filename, O_RDONLY, 0); // filename의 이름을 갖는 파일을 읽기 권한으로 불러온다.
+    // srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); -> Mmap방법 : 파일의 메모리를 그대로 가상 메모리에 매핑함.
+    srcp = (char *)Malloc(filesize); // 11.9 문제 : mmap()과 달리, 먼저 파일의 크기만큼 메모리를 동적할당 해줌.
+    Rio_readn(srcfd, srcp, filesize); // rio_readn을 사용하여 파일의 데이터를 메모리로 읽어옴. ->  srcp에 srcfd의 내용을 매핑해줌
+    Close(srcfd); // 파일을 닫는다.
+    Rio_writen(fd, srcp, filesize);  // 해당 메모리에 있는 파일 내용들을 fd에 보낸다.
+    // Munmap(srcp, filesize); -> Mmap() 방법 : free해주는 느낌
+    free(srcp); // malloc~free
+  //}
 }
 
 /*
@@ -194,7 +192,6 @@ void get_filetype(char *filename, char *filetype)
 	strcpy(filetype, "image/png");
     else if (strstr(filename, ".jpg"))
 	strcpy(filetype, "image/jpeg");
-
     else if (strstr(filename, ".mp4"))
 	strcpy(filetype, "video/mp4");
 
