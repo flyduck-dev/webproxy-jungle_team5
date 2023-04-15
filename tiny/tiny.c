@@ -11,9 +11,9 @@
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 int parse_uri(char *uri, char *filename, char *cgiargs);
-void serve_static(int fd, char *filename, int filesize);
+void serve_static(char *method,int fd, char *filename, int filesize);
 void get_filetype(char *filename, char *filetype);
-void serve_dynamic(int fd, char *filename, char *cgiargs);
+void serve_dynamic(char *method, int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, 
 		 char *shortmsg, char *longmsg);
 
@@ -61,7 +61,7 @@ void doit(int fd)
         return;
     printf("%s", buf);
     sscanf(buf, "%s %s %s", method, uri, version);       //line:netp:doit:parserequest
-    if (strcasecmp(method, "GET")) {                     //line:netp:doit:beginrequesterr
+    if (strcasecmp(method, "GET") && strcasecmp(method, "HEAD") ) {                     //line:netp:doit:beginrequesterr
         clienterror(fd, method, "501", "Not Implemented",
                     "Tiny does not implement this method");
         return;
@@ -82,7 +82,7 @@ void doit(int fd)
 			"Tiny couldn't read the file");
 	    return;
 	}
-	serve_static(fd, filename, sbuf.st_size);        //line:netp:doit:servestatic
+	serve_static(method, fd, filename, sbuf.st_size);        //line:netp:doit:servestatic
     }
     else { /* Serve dynamic content */
 	if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) { //line:netp:doit:executable
@@ -90,7 +90,7 @@ void doit(int fd)
 			"Tiny couldn't run the CGI program");
 	    return;
 	}
-	serve_dynamic(fd, filename, cgiargs);            //line:netp:doit:servedynamic
+	serve_dynamic(method, fd, filename, cgiargs);            //line:netp:doit:servedynamic
     }
 }
 /* $end doit */
@@ -149,7 +149,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
  * serve_static - copy a file back to the client 
  */
 /* $begin serve_static */
-void serve_static(int fd, char *filename, int filesize)
+void serve_static(char* method, int fd, char *filename, int filesize)
 {
     int srcfd;
     char *srcp, filetype[MAXLINE], buf[MAXBUF];
@@ -166,7 +166,10 @@ void serve_static(int fd, char *filename, int filesize)
     sprintf(buf, "Content-type: %s\r\n\r\n", filetype);
     Rio_writen(fd, buf, strlen(buf));    //line:netp:servestatic:endserve
 
-    //if (strcasecmp(method, "GET") == 0) { // 11.11
+    if (strcasecmp(method, "HEAD")==0){
+        return;
+    }
+    if (strcasecmp(method, "GET") == 0) { // 11.11
     /* Send response body to client */
     srcfd = Open(filename, O_RDONLY, 0); // filename의 이름을 갖는 파일을 읽기 권한으로 불러온다.
     // srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); -> Mmap방법 : 파일의 메모리를 그대로 가상 메모리에 매핑함.
@@ -176,7 +179,7 @@ void serve_static(int fd, char *filename, int filesize)
     Rio_writen(fd, srcp, filesize);  // 해당 메모리에 있는 파일 내용들을 fd에 보낸다.
     // Munmap(srcp, filesize); -> Mmap() 방법 : free해주는 느낌
     free(srcp); // malloc~free
-  //}
+  }
 }
 
 /*
@@ -204,7 +207,7 @@ void get_filetype(char *filename, char *filetype)
  * serve_dynamic - run a CGI program on behalf of the client
  */
 /* $begin serve_dynamic */
-void serve_dynamic(int fd, char *filename, char *cgiargs) 
+void serve_dynamic(char *method, int fd, char *filename, char *cgiargs) 
 {
     char buf[MAXLINE], *emptylist[] = { NULL };
 
@@ -213,7 +216,10 @@ void serve_dynamic(int fd, char *filename, char *cgiargs)
     Rio_writen(fd, buf, strlen(buf));
     sprintf(buf, "Server: Tiny Web Server\r\n");
     Rio_writen(fd, buf, strlen(buf));
-  
+
+    if (strcasecmp(method, "HEAD")==0){
+        return;
+    }
     if (Fork() == 0) { /* Child */ //line:netp:servedynamic:fork
 	/* Real server would set all CGI vars here */
 	setenv("QUERY_STRING", cgiargs, 1); //line:netp:servedynamic:setenv
