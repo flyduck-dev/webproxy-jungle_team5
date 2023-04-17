@@ -37,9 +37,9 @@ int main(int argc, char **argv)
                                        //클라 요청을 대기하기 위한 소켓파일 디스크립터 listenfd 반환
     while (1) {
 	    clientlen = sizeof(clientaddr);
-        printf("듣고 있는 중... (%d)\n",clientlen);
-        printf("while문 안에서 argv[0] 확인: %d\n", argv[0]);
-        printf("while문 안에서 argv[1] 확인: %d\n", argv[1]);
+        printf("Proxy 기다리는 중... (%d)\n",clientlen);
+        printf("while문 안에서 argv[0] 확인: %s\n", argv[0]);
+        printf("while문 안에서 argv[1] 확인: %s\n", argv[1]);
         //Accept 함수는 listenfd에 대한 연결 요청이 있을 때까지 블록킹하며 대기
         //클라이언트의 연결 요청이 있으면 클라와 연결된 새로운 소켓파일 디스크립터 connfd를 반환합니다.
         //clientaddr에 클라이언트의 주소 정보를 저장합니다.
@@ -68,16 +68,11 @@ void doit(int fd) //connfd
 
     /* Read request line and headers */
     Rio_readinitb(&rio, fd); // 소켓 파일 디스크립터 fd에 대한 입력 스트림을 초기화
-    if (!Rio_readlineb(&rio, buf, MAXLINE))  //line:netp:doit:readrequest
+    if (!Rio_readlineb(&rio, buf, MAXLINE))
         return;
     printf("buf 확인! %s", buf); // GET /gizmo.mp4 HTTP/1.1
     sscanf(buf, "%s %s %s", method, uri, version);
-    printf("method 확인! %s \n", method); //GET
-    printf("uri 확인! %s \n", uri); ///gizmo.mp4 /godzilla.gif 
-    printf("version 확인! %s \n", version); //HTTP/1.1
-    //sscanf() 함수는 C 표준 라이브러리 함수 중의 하나로, 문자열에서 서식에 맞게 값을 읽어와 변수에 저장하는 함수입니다.
-    //strcasecmp() 함수는 문자열을 대소문자 구분없이 비교하는 함수
-    //둘중 하나가 GET이거나 HEAD라면 실행하지 않는다
+
     if (strcasecmp(method, "GET")!=0 && strcasecmp(method, "HEAD")!=0 ) {
         clienterror(fd, method, "501", "Not Implemented",
         "Tiny does not implement this method");
@@ -120,14 +115,10 @@ void doit(int fd) //connfd
     }
 }
 /* $end doit */
-
 /*
  * read HTTP request headers
  */
-//rp는 rio_t 구조체에 대한 포인터입니다. 이 함수는 rp가 가리키는 rio_t 구조체를 사용하여 HTTP 요청 헤더를 읽어오는 함수입니다.
-//함수를 사용하여 rp가 가리키는 rio_t 구조체에서 한 줄씩 데이터를 읽어옵니다.
-//읽어온 줄이 "\r\n"과 같은 빈 줄이 되면 헤더 읽기를 멈추고 함수를 반환합니다.
-//함수는 HTTP 요청 메시지의 첫 번째 줄(Request-Line) 다음부터 나오는 모든 헤더 정보를 읽어오는 역할을 합니다. Rio_readlineb() 함수를 통해 읽어들인 헤더 정보는 printf() 함수를 사용하여 출력합니다.
+
 void read_requesthdrs(rio_t *rp) 
 {
     char buf[MAXLINE];
