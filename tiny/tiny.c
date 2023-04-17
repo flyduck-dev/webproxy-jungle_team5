@@ -30,15 +30,19 @@ int main(int argc, char **argv)
 	exit(1);
     }
 
-    listenfd = Open_listenfd(argv[1]);
+    listenfd = Open_listenfd(argv[1]); //Open_listenfd 함수는 argv[1]에 지정된 포트번호를 바인딩
+                                       //클라 요청을 대기하기 위한 소켓파일 디스크립터 listenfd 반환
     while (1) {
-	clientlen = sizeof(clientaddr);
-	connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); //line:netp:tiny:accept
-        Getnameinfo((SA *) &clientaddr, clientlen, hostname, MAXLINE, 
-                    port, MAXLINE, 0);
+	    clientlen = sizeof(clientaddr);
+        //Accept 함수는 listenfd에 대한 연결 요청이 있을 때까지 블록킹하며 대기
+        //클라이언트의 연결 요청이 있으면 클라와 연결된 새로운 소켓파일 디스크립터 connfd를 반환합니다.
+        //clientaddr에 클라이언트의 주소 정보를 저장합니다.
+	    connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
+        Getnameinfo((SA *) &clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
+        //clientaddr에 저장된 클라이언트의 주소 정보에서 호스트 이름과 포트 번호를 추출하여 hostname과 port에 저장
         printf("Accepted connection from (%s, %s)\n", hostname, port);
-	doit(connfd);                                             //line:netp:tiny:doit
-	Close(connfd);                                            //line:netp:tiny:close
+	    doit(connfd);   //doit 함수는 connfd에 대한 클라와의 통신을 처리
+	    Close(connfd);  //Close 함수는 connfd를 닫습니다.
     }
 }
 /* $end tinymain */
@@ -56,12 +60,14 @@ void doit(int fd)
     rio_t rio;
 
     /* Read request line and headers */
-    Rio_readinitb(&rio, fd);
+    Rio_readinitb(&rio, fd); // 소켓 파일 디스크립터 fd에 대한 입력 스트림을 초기화
     if (!Rio_readlineb(&rio, buf, MAXLINE))  //line:netp:doit:readrequest
         return;
     printf("%s", buf);
     sscanf(buf, "%s %s %s", method, uri, version);       //line:netp:doit:parserequest
-    if (strcasecmp(method, "GET") && strcasecmp(method, "HEAD") ) {                     //line:netp:doit:beginrequesterr
+//strcasecmp() 함수는 문자열을 대소문자 구분없이 비교하는 함수
+//둘중 하나가 GET이거나 HEAD라면 실행하지 않는다
+    if (strcasecmp(method, "GET")!=0 && strcasecmp(method, "HEAD")!=0 ) {                     //line:netp:doit:beginrequesterr
         clienterror(fd, method, "501", "Not Implemented",
                     "Tiny does not implement this method");
         return;
@@ -77,20 +83,20 @@ void doit(int fd)
     }                                                    //line:netp:doit:endnotfound
 
     if (is_static) { /* Serve static content */          
-	if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) { //line:netp:doit:readable
-	    clienterror(fd, filename, "403", "Forbidden",
+	    if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) { //line:netp:doit:readable
+	        clienterror(fd, filename, "403", "Forbidden",
 			"Tiny couldn't read the file");
-	    return;
-	}
-	serve_static(method, fd, filename, sbuf.st_size);        //line:netp:doit:servestatic
+	        return;
+	    }
+	    serve_static(method, fd, filename, sbuf.st_size);        //line:netp:doit:servestatic
     }
     else { /* Serve dynamic content */
-	if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) { //line:netp:doit:executable
-	    clienterror(fd, filename, "403", "Forbidden",
+	    if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) { //line:netp:doit:executable
+	        clienterror(fd, filename, "403", "Forbidden",
 			"Tiny couldn't run the CGI program");
-	    return;
+	        return;
 	}
-	serve_dynamic(method, fd, filename, cgiargs);            //line:netp:doit:servedynamic
+	    serve_dynamic(method, fd, filename, cgiargs);            //line:netp:doit:servedynamic
     }
 }
 /* $end doit */
@@ -103,11 +109,11 @@ void read_requesthdrs(rio_t *rp)
 {
     char buf[MAXLINE];
 
-    Rio_readlineb(rp, buf, MAXLINE);
+    Rio_readlineb(rp, buf, MAXLINE); // 데이터를 읽어옵니다.
     printf("%s", buf);
     while(strcmp(buf, "\r\n")) {          //line:netp:readhdrs:checkterm
-	Rio_readlineb(rp, buf, MAXLINE);
-	printf("%s", buf);
+	    Rio_readlineb(rp, buf, MAXLINE);
+	    printf("%s", buf);
     }
     return;
 }
@@ -166,7 +172,7 @@ void serve_static(char* method, int fd, char *filename, int filesize)
     sprintf(buf, "Content-type: %s\r\n\r\n", filetype);
     Rio_writen(fd, buf, strlen(buf));    //line:netp:servestatic:endserve
 
-    if (strcasecmp(method, "HEAD")==0){
+    if (strcasecmp(method, "HEAD")== 0){
         return;
     }
     if (strcasecmp(method, "GET") == 0) { // 11.11
@@ -240,6 +246,10 @@ void clienterror(int fd, char *cause, char *errnum,
     char buf[MAXLINE];
 
     /* Print the HTTP response headers */
+    // sprintf()는 C 언어에서 사용되는 함수 중 하나로, 문자열을 생성하는 함수
+    // 다른 문자열과 변수들을 조합하여 새로운 문자열을 생성
+    // printf() 함수와 유사한 방법으로 사용
+    // sprintf() 함수는 출력할 문자열을 char 형태의 버퍼에 저장하며, 이 버퍼의 시작 주소를 반환
     sprintf(buf, "HTTP/1.0 %s %s\r\n", errnum, shortmsg);
     Rio_writen(fd, buf, strlen(buf));
     sprintf(buf, "Content-type: text/html\r\n\r\n");
