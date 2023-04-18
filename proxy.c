@@ -18,13 +18,15 @@ void get_filetype(char *filename, char *filetype);
 void serve_dynamic(char *method, int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
 void sendHeadertoTiny(int fd, char *uri);
+void *thread(void *vargp);
 
 //tiny의 main 그대로 
 int main(int argc, char **argv) { //argv[1] 확인: 8000 //argv[1] 확인: 8080
-  int listenfd, connfd;
+  int listenfd, *connfdp;
   char hostname[MAXLINE], port[MAXLINE];
   socklen_t clientlen;
   struct sockaddr_storage clientaddr;
+  pthread_t tid;
 
   if (argc != 2) {
 	  fprintf(stderr, "usage: %s <port>\n", argv[0]);
@@ -35,11 +37,26 @@ int main(int argc, char **argv) { //argv[1] 확인: 8000 //argv[1] 확인: 8080
 
   while (1) {
     clientlen = sizeof(clientaddr);
-    connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
-    Getnameinfo((SA *) &clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
-    doit(connfd);
-    Close(connfd);
+    /*task1*/
+    //connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
+    //Getnameinfo((SA *) &clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
+    //doit(connfd);
+    //Close(connfd);
+    
+    /*task2*/
+    connfdp = Malloc(sizeof(int)); // int를 동적 할당
+    *connfdp = Accept(listenfd, (SA *)&clientaddr, &clientlen);
+    Pthread_create(&tid, NULL, thread, connfdp); //새 스레드 생성
   }
+}
+
+void *thread(void *vargp){
+  int connfd = *((int *)vargp);
+  Pthread_detach(pthread_self());
+  Free(vargp);
+  doit(connfd); //교재 echo -> doit
+  Close(connfd);
+  return NULL;
 }
 
 void doit(int fd)
