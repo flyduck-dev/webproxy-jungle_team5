@@ -17,7 +17,7 @@ void serve_static(char *method,int fd, char *filename, int filesize);
 void get_filetype(char *filename, char *filetype);
 void serve_dynamic(char *method, int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
-void makeHeader(int clientfd, char *uri, char *host, char *port, char *path);
+void sendHeadertoTiny(int fd, char *uri);
 
 //tiny의 main 그대로 
 int main(int argc, char **argv) { //argv[1] 확인: 8000 //argv[1] 확인: 8080
@@ -60,17 +60,19 @@ void doit(int fd)
 //   printf("host은 %s\n", host);//host은 43.201.38.164
 //   printf("post은 %s\n", port);//post은 8000
 //   printf("path은 %s\n", path);//path은 /home.html
+  
   /* Send request to server */
   serverfd = Open_clientfd(host, port);
-  sendHeader(serverfd, uri, host, port, path);
+  sendHeadertoTiny(serverfd, uri);
 
   /* Receive response from server and forward it to the client */
   Rio_readinitb(&srio, serverfd);
-  Rio_readlineb(&srio, buf, MAXLINE);
-  Rio_writen(fd, buf, strlen(buf));
-  read_requesthdrs(&srio);
+//   Rio_readlineb(&srio, buf, MAXLINE);
+//   Rio_writen(fd, buf, strlen(buf));
+//   read_requesthdrs(&srio);
   size_t n;
   while ((n = Rio_readlineb(&srio, buf, MAXLINE)) != 0) {
+    printf("%s",buf);
       Rio_writen(fd, buf, n);
   }
 
@@ -123,10 +125,13 @@ void parse_uri(char *uri, char *host, char *port, char *path) {
     } else {
         strcpy(path, path_start);
     }
+    printf("path은 %s\n", path);//path은 /home.html
 }
 
-void sendHeader(int fd, char *uri, char *host, char *port, char *path) { 
-    char buf[MAXLINE];
+void sendHeadertoTiny(int fd, char *uri) { 
+    char buf[MAXLINE], host[MAXLINE], port[MAXLINE], path[MAXLINE];
+
+    parse_uri(uri, host, port, path);
 
     sprintf(buf, "GET %s HTTP/1.1\r\n", path);
     Rio_writen(fd, buf, strlen(buf));
