@@ -44,15 +44,15 @@ int main(int argc, char **argv) { //argv[1] 확인: 8000 //argv[1] 확인: 8080
 }
 void doit(int fd)
 {
-  rio_t rio, server_rio;
+  rio_t crio, srio;
   char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
   char filename[MAXLINE], cgiargs[MAXLINE];
   char host[MAXLINE], port[MAXLINE], path[MAXLINE];
   int serverfd;
 
   /* Read client request */
-  Rio_readinitb(&rio, fd);
-  Rio_readlineb(&rio, buf, MAXLINE);
+  Rio_readinitb(&crio, fd);
+  Rio_readlineb(&crio, buf, MAXLINE);
   sscanf(buf, "%s %s %s", method, uri, version);
   //read_requesthdrs(&rio); 없어도 될 듯하여 주석
   //parse_uri 테스트 완료
@@ -63,20 +63,20 @@ void doit(int fd)
   printf("path은 %s\n", path);//path은 /home.html
 
   /* Send request to server */
-  serverfd = Open_clientfd("localhost", port);
+  serverfd = Open_clientfd(host, port);
   sprintf(buf, "%s %s HTTP/1.0\r\n", method, uri);
   Rio_writen(serverfd, buf, strlen(buf));
   Rio_writen(serverfd, user_agent_hdr, strlen(user_agent_hdr));
   Rio_writen(serverfd, "\r\n", strlen("\r\n")); //일단 keep
-  read_requesthdrs(&rio);
+  read_requesthdrs(&crio);
 
   /* Receive response from server and forward it to the client */
-  Rio_readinitb(&server_rio, serverfd);
-  Rio_readlineb(&server_rio, buf, MAXLINE);
+  Rio_readinitb(&srio, serverfd);
+  Rio_readlineb(&srio, buf, MAXLINE);
   Rio_writen(fd, buf, strlen(buf));
-  read_requesthdrs(&server_rio);
+  read_requesthdrs(&srio);
   size_t n;
-  while ((n = Rio_readlineb(&server_rio, buf, MAXLINE)) != 0) {
+  while ((n = Rio_readlineb(&srio, buf, MAXLINE)) != 0) {
       Rio_writen(fd, buf, n);
   }
 
