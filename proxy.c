@@ -19,13 +19,17 @@ void serve_dynamic(char *method, int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
 void sendHeadertoTiny(int fd, char *uri);
 void *thread(void *vargp);
+Cache *find_node(char *path);
 
-struct cache_storage {
+struct Cache_storage {
     char *path;
     char *contents_buf;
-    struct cache_storage *next_storage;
+    struct Cache_storage *next_storage;
+    struct Cache_storage *prev_storage;
     int contents_length;
-};
+} typedef Cache;
+
+static Cache *cache_list_head = NULL;
 
 //tiny의 main 그대로 
 int main(int argc, char **argv) { //argv[1] 확인: 8000 //argv[1] 확인: 8080
@@ -72,7 +76,7 @@ void doit(int fd)
   char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
   char filename[MAXLINE], cgiargs[MAXLINE];
   char host[MAXLINE], port[MAXLINE], path[MAXLINE];
-  int serverfd;
+  int serverfd, size;
 
   /* Read client request */
   Rio_readinitb(&crio, fd);
@@ -84,6 +88,15 @@ void doit(int fd)
 //   printf("host은 %s\n", host);//host은 43.201.38.164
 //   printf("post은 %s\n", port);//post은 8000
 //   printf("path은 %s\n", path);//path은 /home.html
+
+  /* Find cache object
+  Cache *cacheObj = find_node(path);
+  if (cacheObj != NULL) {
+    // 캐시에서 객체를 찾았을 경우
+    Rio_writen(fd, cacheObj->contents_buf, cacheObj->contents_length);
+    return;
+  }
+  */
   
   /* Send request to server */
   serverfd = Open_clientfd(host, port);
@@ -95,9 +108,14 @@ void doit(int fd)
 //   Rio_writen(fd, buf, strlen(buf));
 //   read_requesthdrs(&srio);
   size_t n;
+  char *bufptr = buf;
   while ((n = Rio_readlineb(&srio, buf, MAXLINE)) != 0) {
     printf("%s",buf);
-      Rio_writen(fd, buf, n);
+    Rio_writen(fd, buf, n);
+    bufptr += n;
+    if (strstr(buf, "\r\n") != NULL) {
+      break;
+    }
   }
 
   /* Close connection */
@@ -168,4 +186,16 @@ void sendHeadertoTiny(int fd, char *uri) {
     Rio_writen(fd, buf, strlen(buf));
     sprintf(buf, "%sProxy-Connection: close\r\n\r\n", buf);
     Rio_writen(fd, buf, strlen(buf));
+}
+
+/* Find node with given path */
+Cache *find_node(char *path) {
+    Cache *current = cache_list_head;
+    while (current != NULL) {
+        if (strcmp(current->path, path) == 0) {
+            return current;
+        }
+        current = current->next_storage;
+    }
+    return NULL;
 }
