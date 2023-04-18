@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "csapp.h"
+#include <time.h>
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
@@ -9,6 +10,14 @@
 static const char *user_agent_hdr =
     "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 "
     "Firefox/10.0.3\r\n";
+struct Cache_storage {
+    char *path;
+    char *contents_buf;
+    struct Cache_storage *next_storage;
+    struct Cache_storage *prev_storage;
+    int contents_length;
+    time_t time;
+} typedef Cache;
 
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
@@ -19,6 +28,10 @@ void serve_dynamic(char *method, int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
 void sendHeadertoTiny(int fd, char *uri);
 void *thread(void *vargp);
+Cache *find_node(char *path);
+Cache *insert_first(Cache *head, rio_t *srio, int value);
+
+static Cache *cache_list_head = NULL;
 
 //tiny의 main 그대로 
 int main(int argc, char **argv) { //argv[1] 확인: 8000 //argv[1] 확인: 8080
@@ -37,6 +50,7 @@ int main(int argc, char **argv) { //argv[1] 확인: 8000 //argv[1] 확인: 8080
 
   while (1) {
     clientlen = sizeof(clientaddr);
+
     /*task1*/
     //connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
     //Getnameinfo((SA *) &clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
@@ -88,12 +102,16 @@ void doit(int fd)
 //   Rio_writen(fd, buf, strlen(buf));
 //   read_requesthdrs(&srio);
   size_t n;
+  char *bufptr = buf;
+  int c_length;
   while ((n = Rio_readlineb(&srio, buf, MAXLINE)) != 0) {
     printf("%s",buf);
-      Rio_writen(fd, buf, n);
+    Rio_writen(fd, buf, n);
+    c_length += n;
+    printf("길이는 길이는 %d\n",c_length);
   }
+  insert_first(&cache_list_head, &srio, c_length);
 
-  /* Close connection */
   Close(serverfd);
 }
 
@@ -161,4 +179,18 @@ void sendHeadertoTiny(int fd, char *uri) {
     Rio_writen(fd, buf, strlen(buf));
     sprintf(buf, "%sProxy-Connection: close\r\n\r\n", buf);
     Rio_writen(fd, buf, strlen(buf));
+}
+
+Cache *insert_first(Cache *head, rio_t *srio, int content_length){
+  Cache *p = (Cache *)malloc(sizeof(Cache));
+  p->contents_buf = (char*) malloc(content_length);
+  p->contents_length = content_length;
+  p->time = time(NULL);
+  p->next_storage = head;
+  p->prev_storage = NULL;
+  if (head != NULL) {
+    head->prev_storage = p;
+  }
+  head = p;
+  return head;
 }
