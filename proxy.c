@@ -12,7 +12,7 @@ static const char *user_agent_hdr =
 
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
-int parse_uri(char *uri, char *filename, char *cgiargs);
+void parse_uri(char *uri, char *host, char *port, char *path);
 void serve_static(char *method,int fd, char *filename, int filesize);
 void get_filetype(char *filename, char *filetype);
 void serve_dynamic(char *method, int fd, char *filename, char *cgiargs);
@@ -27,7 +27,7 @@ int main(int argc, char **argv) { //argv[1] 확인: 8000 //argv[1] 확인: 8080
   socklen_t clientlen;
   struct sockaddr_storage clientaddr;
 
-  if (argc != 3) {
+  if (argc != 2) {
 	  fprintf(stderr, "usage: %s <port>\n", argv[0]);
 	  exit(1);
   }
@@ -47,6 +47,7 @@ void doit(int fd)
   rio_t rio, server_rio;
   char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
   char filename[MAXLINE], cgiargs[MAXLINE];
+  char host[MAXLINE], port[MAXLINE], path[MAXLINE];
   int serverfd;
 
   /* Read client request */
@@ -54,9 +55,15 @@ void doit(int fd)
   Rio_readlineb(&rio, buf, MAXLINE);
   sscanf(buf, "%s %s %s", method, uri, version);
   //read_requesthdrs(&rio); 없어도 될 듯하여 주석
+  //parse_uri 테스트 완료
+  parse_uri(uri, host, port, path);
+  printf("uri은 %s\n", uri); //uri은 http://43.201.38.164:8000/home.html
+  printf("host은 %s\n", host);//host은 43.201.38.164
+  printf("post은 %s\n", port);//post은 8000
+  printf("path은 %s\n", path);//path은 /home.html
 
   /* Send request to server */
-  serverfd = Open_clientfd("localhost", "8000");
+  serverfd = Open_clientfd("localhost", port);
   sprintf(buf, "%s %s HTTP/1.0\r\n", method, uri);
   Rio_writen(serverfd, buf, strlen(buf));
   Rio_writen(serverfd, user_agent_hdr, strlen(user_agent_hdr));
@@ -90,4 +97,36 @@ void read_requesthdrs(rio_t *rp)
         i++;
     }
     return;
+}
+
+//http://43.201.38.164:8000/home.html
+void parse_uri(char *uri, char *host, char *port, char *path) {
+    char *host_start = strstr(uri, "://");
+    if (host_start != NULL) {
+        host_start += 3;
+    } else {
+        host_start = uri;
+    }
+    char *host_end = strchr(host_start, ':');
+    if (host_end == NULL) {
+        strcpy(host, host_start);
+        strcpy(port, "80"); // 기본 HTTP 포트 설정
+    } else {
+        strncpy(host, host_start, host_end - host_start);
+        host[host_end - host_start] = '\0';
+        char *port_start = host_end + 1;
+        char *port_end = strchr(port_start, '/');
+        if (port_end == NULL) {
+            strcpy(port, port_start);
+        } else {
+            strncpy(port, port_start, port_end - port_start);
+            port[port_end - port_start] = '\0';
+        }
+    }
+    char *path_start = strchr(host_end, '/');
+    if (path_start == NULL) {
+        strcpy(path, "/");
+    } else {
+        strcpy(path, path_start);
+    }
 }
