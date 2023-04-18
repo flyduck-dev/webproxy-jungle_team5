@@ -91,7 +91,15 @@ void doit(int fd)
 //   printf("host은 %s\n", host);//host은 43.201.38.164
 //   printf("post은 %s\n", port);//post은 8000
 //   printf("path은 %s\n", path);//path은 /home.html
-  
+  /* Find cache object
+  Cache *c = find_node(path);
+  if (c != NULL) {
+    // 캐시에서 객체를 찾았을 경우
+    Rio_writen(fd, c->contents_buf, c->contents_length);
+    cache_list_head = insert_first(head, srio, c->contents_length);
+    return;
+  }
+  */
   /* Send request to server */
   serverfd = Open_clientfd(host, port);
   sendHeadertoTiny(serverfd, uri);
@@ -111,7 +119,6 @@ void doit(int fd)
     printf("길이는 길이는 %d\n",c_length);
   }
   insert_first(&cache_list_head, &srio, c_length);
-
   Close(serverfd);
 }
 
@@ -193,4 +200,16 @@ Cache *insert_first(Cache *head, rio_t *srio, int content_length){
   }
   head = p;
   return head;
+}
+
+/* Find node with given path */
+Cache *find_node(char *path) {
+    Cache *current = cache_list_head;
+    while (current != NULL) {
+        if (strcmp(current->path, path) == 0) {
+            return current;
+        }
+        current = current->next_storage;
+    }
+    return NULL;
 }
