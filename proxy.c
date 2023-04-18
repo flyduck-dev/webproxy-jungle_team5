@@ -53,13 +53,14 @@ void doit(int fd)
   Rio_readinitb(&rio, fd);
   Rio_readlineb(&rio, buf, MAXLINE);
   sscanf(buf, "%s %s %s", method, uri, version);
-  read_requesthdrs(&rio);
+  //read_requesthdrs(&rio); 없어도 될 듯하여 주석
+
   /* Send request to server */
   serverfd = Open_clientfd("localhost", "8000");
   sprintf(buf, "%s %s HTTP/1.0\r\n", method, uri);
   Rio_writen(serverfd, buf, strlen(buf));
   Rio_writen(serverfd, user_agent_hdr, strlen(user_agent_hdr));
-  Rio_writen(serverfd, "\r\n", strlen("\r\n"));
+  Rio_writen(serverfd, "\r\n", strlen("\r\n")); //일단 keep
   read_requesthdrs(&rio);
 
   /* Receive response from server and forward it to the client */

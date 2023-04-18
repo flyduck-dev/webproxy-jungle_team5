@@ -17,8 +17,8 @@ void serve_dynamic(char *method, int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, 
 		 char *shortmsg, char *longmsg);
 
-int main(int argc, char **argv) 
-{
+int main(int argc, char **argv) // argc 개수: 2, argv[0] 확인: ./tiny
+{                               // argv[1] 확인: 8000
     int listenfd, connfd;
     char hostname[MAXLINE], port[MAXLINE];
     socklen_t clientlen;
@@ -29,17 +29,12 @@ int main(int argc, char **argv)
 	    fprintf(stderr, "usage: %s <port>\n", argv[0]);
 	    exit(1);
     }
-    printf("argc 개수: %d\n", argc);
-    printf("argv[0] 확인: %s\n", argv[0]);
-    printf("argv[1] 확인: %s\n", argv[1]);
 
     listenfd = Open_listenfd(argv[1]); //Open_listenfd 함수는 argv[1]에 지정된 포트번호를 바인딩
                                        //클라 요청을 대기하기 위한 소켓파일 디스크립터 listenfd 반환
     while (1) {
 	    clientlen = sizeof(clientaddr);
         printf("Proxy 기다리는 중... (%d)\n",clientlen);
-        printf("while문 안에서 argv[0] 확인: %s\n", argv[0]);
-        printf("while문 안에서 argv[1] 확인: %s\n", argv[1]);
         //Accept 함수는 listenfd에 대한 연결 요청이 있을 때까지 블록킹하며 대기
         //클라이언트의 연결 요청이 있으면 클라와 연결된 새로운 소켓파일 디스크립터 connfd를 반환합니다.
         //clientaddr에 클라이언트의 주소 정보를 저장합니다.
@@ -47,7 +42,7 @@ int main(int argc, char **argv)
         Getnameinfo((SA *) &clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
         //clientaddr에 저장된 클라이언트의 주소 정보에서 호스트 이름과 포트 번호를 추출하여 hostname과 port에 저장
         //연결된 클라이언트의 주소 정보에서 호스트 이름과 포트 번호를 추출하여 hostname과 port 변수에 저장합니다.
-        printf("Accepted connection from (클라 주소에서 뽑은 호스트이름 %s, 클라 주소에서 뽑은 포트번호 %s)\n", hostname, port);
+        printf("Accepted connection from (클라 주소에서 뽑은 호스트이름 %s, 클라 주소에서 뽑은 포트번호 %s)\n", hostname, port); //localhost 58960
 	    doit(connfd);   //doit 함수는 connfd에 대한 클라와의 통신을 처리
 	    Close(connfd);  //Close 함수는 connfd를 닫습니다.
     }
