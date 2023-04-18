@@ -17,8 +17,7 @@ void serve_static(char *method,int fd, char *filename, int filesize);
 void get_filetype(char *filename, char *filetype);
 void serve_dynamic(char *method, int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
-//printf("%s", user_agent_hdr);
-
+void makeHeader(int clientfd, char *uri, char *host, char *port, char *path);
 
 //tiny의 main 그대로 
 int main(int argc, char **argv) { //argv[1] 확인: 8000 //argv[1] 확인: 8080
@@ -42,6 +41,7 @@ int main(int argc, char **argv) { //argv[1] 확인: 8000 //argv[1] 확인: 8080
     Close(connfd);
   }
 }
+
 void doit(int fd)
 {
   rio_t crio, srio;
@@ -54,21 +54,15 @@ void doit(int fd)
   Rio_readinitb(&crio, fd);
   Rio_readlineb(&crio, buf, MAXLINE);
   sscanf(buf, "%s %s %s", method, uri, version);
-  //read_requesthdrs(&rio); 없어도 될 듯하여 주석
   //parse_uri 테스트 완료
   parse_uri(uri, host, port, path);
-  printf("uri은 %s\n", uri); //uri은 http://43.201.38.164:8000/home.html
-  printf("host은 %s\n", host);//host은 43.201.38.164
-  printf("post은 %s\n", port);//post은 8000
-  printf("path은 %s\n", path);//path은 /home.html
-
+//   printf("uri은 %s\n", uri); //uri은 http://43.201.38.164:8000/home.html
+//   printf("host은 %s\n", host);//host은 43.201.38.164
+//   printf("post은 %s\n", port);//post은 8000
+//   printf("path은 %s\n", path);//path은 /home.html
   /* Send request to server */
   serverfd = Open_clientfd(host, port);
-  sprintf(buf, "%s %s HTTP/1.0\r\n", method, uri);
-  Rio_writen(serverfd, buf, strlen(buf));
-  Rio_writen(serverfd, user_agent_hdr, strlen(user_agent_hdr));
-  Rio_writen(serverfd, "\r\n", strlen("\r\n")); //일단 keep
-  read_requesthdrs(&crio);
+  sendHeader(serverfd, uri, host, port, path);
 
   /* Receive response from server and forward it to the client */
   Rio_readinitb(&srio, serverfd);
@@ -129,4 +123,20 @@ void parse_uri(char *uri, char *host, char *port, char *path) {
     } else {
         strcpy(path, path_start);
     }
+}
+
+void sendHeader(int fd, char *uri, char *host, char *port, char *path) { 
+    char buf[MAXLINE];
+
+    sprintf(buf, "GET %s HTTP/1.1\r\n", path);
+    Rio_writen(fd, buf, strlen(buf));
+    sprintf(buf, "%sHost: %s:%d\r\n", buf, host, port);
+    Rio_writen(fd, buf, strlen(buf));
+    // sprintf(buf, "%s%s", buf, user_agent_hdr);
+    // Rio_writen(fd, buf, strlen(buf));
+    Rio_writen(fd, user_agent_hdr, strlen(user_agent_hdr));
+    sprintf(buf, "%sConnection: close\r\n", buf);
+    Rio_writen(fd, buf, strlen(buf));
+    sprintf(buf, "%sProxy-Connection: close\r\n\r\n", buf);
+    Rio_writen(fd, buf, strlen(buf));
 }
