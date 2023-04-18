@@ -20,6 +20,13 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longms
 void sendHeadertoTiny(int fd, char *uri);
 void *thread(void *vargp);
 
+struct cache_storage {
+    char *path;
+    char *contents_buf;
+    struct cache_storage *next_storage;
+    int contents_length;
+};
+
 //tiny의 main 그대로 
 int main(int argc, char **argv) { //argv[1] 확인: 8000 //argv[1] 확인: 8080
   int listenfd, *connfdp;
