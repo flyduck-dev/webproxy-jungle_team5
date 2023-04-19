@@ -13,14 +13,13 @@ static const char *user_agent_hdr =
     "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 "
     "Firefox/10.0.3\r\n";
 
-struct Cache_storage {
+typedef struct Cache {
     char *path; // : home.html
     char *contents_buf; // <html><homr>~~~
-    struct Cache_storage *next_cache; // next Cache_node
-    struct Cache_storage *prev_cache; // prev Cache_node
+    struct Cache *next_cache; // next Cache_node
+    struct Cache *prev_cache; // prev Cache_node
     int contents_length;
-    time_t time;
-} typedef Cache;
+} Cache;
 
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
@@ -32,7 +31,10 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longms
 void sendHeadertoTiny(int fd, char *uri);
 void *thread(void *vargp);
 Cache *find_node(char *path);
-Cache *insert_first(Cache *head, rio_t *srio, int value);
+Cache *insert_copy_first(Cache *head, Cache *c, int content_length);
+void *erase_node(Cache *del_node);
+void *delete_node();
+void *cache_init(Cache *head, char *buf, int content_length, char* path);
 
 static Cache *cache_list_head = NULL;
 
@@ -66,11 +68,12 @@ int main(int argc, char **argv) { //argv[1] 확인: 8000 //argv[1] 확인: 8080
   }
 }
 
+//교재 echo -> doit
 void *thread(void *vargp){
   int connfd = *((int *)vargp);
   Pthread_detach(pthread_self());
   Free(vargp);
-  doit(connfd); //교재 echo -> doit
+  doit(connfd);
   Close(connfd);
   return NULL;
 }
@@ -93,16 +96,22 @@ void doit(int fd)
   //printf("host은 %s\n", host);//host은 43.201.38.164
   //printf("post은 %s\n", port);//post은 8000
   //printf("path은 %s\n", path);//path은 /home.html
-  /* Find cache object
-  Cache *c = find_node(path);
-  if (c != NULL) {
-    // 캐시에서 객체를 찾았을 경우
-    Rio_writen(fd, c->contents_buf, c->contents_length);
-    cache_list_head = insert_first(head, srio, c->contents_length);
-    return;
-  }
-  */
-  /* Send request to server */
+
+
+  /* 캐시 로직 시작 Find cache object*/
+//   Cache *c = find_node(path);
+//   if (c == cache_list_head){
+//     Rio_writen(fd, c->contents_buf, c->contents_length);
+//     return;
+//   }
+//   else if (c != NULL) {
+//     // 캐시에서 객체를 찾았을 경우
+//     Rio_writen(fd, c->contents_buf, c->contents_length);
+//     cache_list_head = insert_copy_first(cache_list_head, c, c->contents_length);
+//     cache_list_head = erase_node(c);
+//     return;
+//   }
+  /* 캐시가 없을 경우, Send request to server */
   serverfd = Open_clientfd(host, port);
   sendHeadertoTiny(serverfd, uri);
 
@@ -112,14 +121,14 @@ void doit(int fd)
   //Rio_writen(fd, buf, strlen(buf));
   //read_requesthdrs(&srio);
   size_t n;
-  char *bufptr = buf;
   int c_length;
   while ((n = Rio_readlineb(&srio, buf, MAXLINE)) != 0) {
     printf("%s",buf);
     Rio_writen(fd, buf, n);
     c_length += n;
   }
-  insert_first(&cache_list_head, &srio, c_length);
+  cache_init(&cache_list_head, buf, c_length, path);
+
   Close(serverfd);
 }
 
@@ -186,11 +195,14 @@ void sendHeadertoTiny(int fd, char *uri) {
     Rio_writen(fd, buf, strlen(buf));
 }
 
-Cache *insert_first(Cache *head, rio_t *srio, int content_length){
+//cache_list_head = insert_first(cache_list_head, c, c->contents_length);
+Cache *insert_copy_first(Cache *head, Cache *c, int content_length){
   Cache *p = (Cache *)malloc(sizeof(Cache));
-  p->contents_buf = (char*) malloc(content_length);
+  p->path = strdup(c->path);
+  p->contents_buf = (char*) malloc(content_length+1);
+  memcpy(p->contents_buf, c->contents_buf, content_length);
+  p->contents_buf[content_length] = '\0';
   p->contents_length = content_length;
-  p->time = time(NULL);
   p->next_cache = head;
   p->prev_cache = NULL;
   if (head != NULL) {
@@ -198,6 +210,39 @@ Cache *insert_first(Cache *head, rio_t *srio, int content_length){
   }
   head = p;
   return head;
+}
+
+//정리 
+void *erase_node(Cache *del_node) {
+    if (del_node == cache_list_head) return;
+
+    if (del_node->prev_cache != NULL) {
+        del_node->prev_cache->next_cache = del_node->next_cache;
+    }
+
+    if (del_node->next_cache != NULL) {
+        del_node->next_cache->prev_cache = del_node->prev_cache;
+    }
+    free(del_node->path);
+    free(del_node->contents_buf);
+    free(del_node);
+}
+
+//cache_list_head = insert_first(cache_list_head, c, c->contents_length);
+void *cache_init(Cache *head, char *buf, int content_length, char* path){
+  Cache *p = (Cache *)malloc(sizeof(Cache));
+  p->path = (char*)malloc(strlen(path) + 1); // 동적으로 메모리 할당
+  strcpy(p->path, path);
+  p->contents_buf = (char*) malloc(content_length+1);
+  memcpy(p->contents_buf, buf, content_length);
+  p->contents_buf[content_length] = '\0'; // 문자열 끝에 널 문자 추가
+  p->contents_length = content_length;
+  p->next_cache = head;
+  p->prev_cache = NULL;
+  if (head != NULL) {
+    head->prev_cache = p;
+  }
+  head = p;
 }
 
 /* Find node with given path */
@@ -210,11 +255,4 @@ Cache *find_node(char *path) {
         current = current->next_cache;
     }
     return NULL;
-}
-
-Cache *delete_node(Cache *del_node) {
-    if (del_node == cache_list_head) return;
-    del_node->prev_cache->next_cache = del_node->next_cache;
-    del_node->next_cache->prev_cache = del_node->prev_cache;
-    free(del_node);
 }
