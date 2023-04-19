@@ -15,9 +15,9 @@ static const char *user_agent_hdr =
 
 struct Cache_storage {
     char *path; // : home.html
-    char *contents_buf; //
-    struct Cache_storage *next_storage;
-    struct Cache_storage *prev_storage;
+    char *contents_buf; // <html><homr>~~~
+    struct Cache_storage *next_cache; // next Cache_node
+    struct Cache_storage *prev_cache; // prev Cache_node
     int contents_length;
     time_t time;
 } typedef Cache;
@@ -191,10 +191,10 @@ Cache *insert_first(Cache *head, rio_t *srio, int content_length){
   p->contents_buf = (char*) malloc(content_length);
   p->contents_length = content_length;
   p->time = time(NULL);
-  p->next_storage = head;
-  p->prev_storage = NULL;
+  p->next_cache = head;
+  p->prev_cache = NULL;
   if (head != NULL) {
-    head->prev_storage = p;
+    head->prev_cache = p;
   }
   head = p;
   return head;
@@ -207,7 +207,14 @@ Cache *find_node(char *path) {
         if (strcmp(current->path, path) == 0) {
             return current;
         }
-        current = current->next_storage;
+        current = current->next_cache;
     }
     return NULL;
+}
+
+Cache *delete_node(Cache *del_node) {
+    if (del_node == cache_list_head) return;
+    del_node->prev_cache->next_cache = del_node->next_cache;
+    del_node->next_cache->prev_cache = del_node->prev_cache;
+    free(del_node);
 }
