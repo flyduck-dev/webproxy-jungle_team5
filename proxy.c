@@ -31,10 +31,10 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longms
 void sendHeadertoTiny(int fd, char *uri);
 void *thread(void *vargp);
 Cache *find_node(char *path);
-Cache *insert_copy_first(Cache *head, Cache *c, int content_length);
+void insert_copy_first(Cache *c, int content_length);
 void *erase_node(Cache *del_node);
 void *delete_node();
-void *cache_init(Cache *head, char *buf, int content_length, char* path);
+void cache_init(char *buf, int content_length, char* path);
 
 static Cache *cache_list_head = NULL;
 
@@ -99,18 +99,22 @@ void doit(int fd)
 
 
   /* 캐시 로직 시작 Find cache object*/
-//   Cache *c = find_node(path);
+  Cache *c = find_node(path);
+  printf("  /* 캐시 로직 시작 Find cache object*/%s\n",c);
 //   if (c == cache_list_head){
+//     printf(" 11111\n");
 //     Rio_writen(fd, c->contents_buf, c->contents_length);
 //     return;
 //   }
-//   else if (c != NULL) {
-//     // 캐시에서 객체를 찾았을 경우
-//     Rio_writen(fd, c->contents_buf, c->contents_length);
-//     cache_list_head = insert_copy_first(cache_list_head, c, c->contents_length);
-//     cache_list_head = erase_node(c);
-//     return;
-//   }
+//   else 
+  if (c != NULL) {
+    // 캐시에서 객체를 찾았을 경우
+    Rio_writen(fd, c->contents_buf, c->contents_length);
+    insert_copy_first(c, c->contents_length);
+    erase_node(c);
+    printf("캐시가 있습니다\n");
+    return;
+  }
   /* 캐시가 없을 경우, Send request to server */
   serverfd = Open_clientfd(host, port);
   sendHeadertoTiny(serverfd, uri);
@@ -127,8 +131,9 @@ void doit(int fd)
     Rio_writen(fd, buf, n);
     c_length += n;
   }
-  cache_init(&cache_list_head, buf, c_length, path);
-
+  printf("캐시가 없습니다\n");
+  cache_init(buf, c_length, path);
+  printf("이젠 있지 않아?\n");
   Close(serverfd);
 }
 
@@ -196,20 +201,20 @@ void sendHeadertoTiny(int fd, char *uri) {
 }
 
 //cache_list_head = insert_first(cache_list_head, c, c->contents_length);
-Cache *insert_copy_first(Cache *head, Cache *c, int content_length){
+void insert_copy_first(Cache *c, int content_length){
+ printf("인서트 진입\n");
   Cache *p = (Cache *)malloc(sizeof(Cache));
   p->path = strdup(c->path);
   p->contents_buf = (char*) malloc(content_length+1);
   memcpy(p->contents_buf, c->contents_buf, content_length);
   p->contents_buf[content_length] = '\0';
   p->contents_length = content_length;
-  p->next_cache = head;
+  p->next_cache = cache_list_head;
   p->prev_cache = NULL;
-  if (head != NULL) {
-    head->prev_cache = p;
+  if (cache_list_head != NULL) {
+    cache_list_head->prev_cache = p;
   }
-  head = p;
-  return head;
+  cache_list_head = p;
 }
 
 //정리 
@@ -228,8 +233,9 @@ void *erase_node(Cache *del_node) {
     free(del_node);
 }
 
+
 //cache_list_head = insert_first(cache_list_head, c, c->contents_length);
-void *cache_init(Cache *head, char *buf, int content_length, char* path){
+void cache_init(char *buf, int content_length, char* path){
   Cache *p = (Cache *)malloc(sizeof(Cache));
   p->path = (char*)malloc(strlen(path) + 1); // 동적으로 메모리 할당
   strcpy(p->path, path);
@@ -237,12 +243,9 @@ void *cache_init(Cache *head, char *buf, int content_length, char* path){
   memcpy(p->contents_buf, buf, content_length);
   p->contents_buf[content_length] = '\0'; // 문자열 끝에 널 문자 추가
   p->contents_length = content_length;
-  p->next_cache = head;
+  p->next_cache = cache_list_head;
   p->prev_cache = NULL;
-  if (head != NULL) {
-    head->prev_cache = p;
-  }
-  head = p;
+  cache_list_head = p;
 }
 
 /* Find node with given path */
