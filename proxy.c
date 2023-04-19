@@ -125,7 +125,7 @@ void doit(int fd)
   //Rio_writen(fd, buf, strlen(buf));
   //read_requesthdrs(&srio);
   size_t n;
-  int c_length;
+  int c_length = 0;
   while ((n = Rio_readlineb(&srio, buf, MAXLINE)) != 0) {
     printf("%s",buf);
     Rio_writen(fd, buf, n);
