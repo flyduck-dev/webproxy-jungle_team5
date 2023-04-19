@@ -124,15 +124,18 @@ void doit(int fd)
   //Rio_readlineb(&srio, buf, MAXLINE);
   //Rio_writen(fd, buf, strlen(buf));
   //read_requesthdrs(&srio);
+  char* cache_buf = (char *)malloc(MAX_OBJECT_SIZE);
+  strcpy(cache_buf, "");
   size_t n;
-  int c_length = 0;
+  int c_length;
   while ((n = Rio_readlineb(&srio, buf, MAXLINE)) != 0) {
     printf("%s",buf);
     Rio_writen(fd, buf, n);
     c_length += n;
+    strcat(cache_buf, buf);
   }
   printf("캐시가 없습니다\n");
-  cache_init(buf, c_length, path);
+  cache_init(cache_buf, c_length, path);
   printf("이젠 있지 않아?\n");
   Close(serverfd);
 }
@@ -201,13 +204,14 @@ void sendHeadertoTiny(int fd, char *uri) {
 }
 
 //cache_list_head = insert_first(cache_list_head, c, c->contents_length);
+//이미 리스트에 존재하는 캐시를 복사하여 리스트의 맨 앞에 추가하는 함수
 void insert_copy_first(Cache *c, int content_length){
  printf("인서트 진입\n");
   Cache *p = (Cache *)malloc(sizeof(Cache));
   p->path = strdup(c->path);
-  p->contents_buf = (char*) malloc(content_length+1);
-  memcpy(p->contents_buf, c->contents_buf, content_length);
-  p->contents_buf[content_length] = '\0';
+  p->contents_buf = (char*) malloc(MAX_OBJECT_SIZE);
+  memcpy(p->contents_buf, c->contents_buf, MAX_OBJECT_SIZE);
+  //p->contents_buf[content_length] = '\0';
   p->contents_length = content_length;
   p->next_cache = cache_list_head;
   p->prev_cache = NULL;
@@ -235,17 +239,21 @@ void *erase_node(Cache *del_node) {
 
 
 //cache_list_head = insert_first(cache_list_head, c, c->contents_length);
+//기존 캐시 리스트에 존재하지 않는 새로운 캐시추가
 void cache_init(char *buf, int content_length, char* path){
-  Cache *p = (Cache *)malloc(sizeof(Cache));
-  p->path = (char*)malloc(strlen(path) + 1); // 동적으로 메모리 할당
-  strcpy(p->path, path);
-  p->contents_buf = (char*) malloc(content_length+1);
-  memcpy(p->contents_buf, buf, content_length);
-  p->contents_buf[content_length] = '\0'; // 문자열 끝에 널 문자 추가
-  p->contents_length = content_length;
-  p->next_cache = cache_list_head;
-  p->prev_cache = NULL;
-  cache_list_head = p;
+    Cache *p = (Cache *)malloc(sizeof(Cache));
+    p->path = (char*)malloc(strlen(path) + 1); // 동적으로 메모리 할당
+    strcpy(p->path, path);
+    p->contents_buf = (char*) malloc(MAX_OBJECT_SIZE);
+    memcpy(p->contents_buf, buf, MAX_OBJECT_SIZE);
+    //p->contents_buf[content_length] = '\0'; // 문자열 끝에 널 문자 추가
+    p->contents_length = content_length;
+    p->next_cache = cache_list_head;
+    p->prev_cache = NULL;
+    if (cache_list_head != NULL) {
+    cache_list_head->prev_cache = p;
+    }
+    cache_list_head = p;
 }
 
 /* Find node with given path */
